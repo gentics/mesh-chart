@@ -1,0 +1,191 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "mesh.fullname" . }}-master
+  labels:
+    app: {{ template "mesh.name" . }}
+    chart: {{ template "mesh.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1 # we use only 1 master and X replicas in this chart
+  selector:
+    matchLabels:
+      release: {{ .Release.Name }}
+      role: master
+      app: {{ template "mesh.name" . }}
+  serviceName: "mesh-master"
+  template:
+    metadata:
+      labels:
+        release: {{ .Release.Name }}
+        role: master
+        app: {{ template "mesh.name" . }}
+    spec:
+      terminationGracePeriodSeconds: 30
+      initContainers:
+      - name: init
+        image: alpine
+        command: ["/bin/sh", "/config/init-master-node.sh"]
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: {{ template "mesh.nfs.name" . }}
+          mountPath: "/uploads"
+          subPath: {{ template "mesh.fullname.no.override" . }}-uploads
+        - name: {{ template "mesh.nfs.name" . }}
+          mountPath: "/backups-nfs"
+          subPath: {{ template "mesh.fullname.no.override" . }}-backups
+        - name: mesh-config
+          mountPath: /config
+        - name: mesh-data-master
+          mountPath: "/graphdb"
+          subPath: "graphdb"
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/bin/sh", "/config/startup-master-node.sh"]
+        env:
+         - name: "hazelcast.kubernetes.service-dns"
+           value: {{ template "mesh.fullname" . }}-hazelcast.{{ .Release.Namespace }}.svc.cluster.local
+         - name: MESH_CLUSTER_ENABLED
+           value: {{ .Values.mesh.cluster.enabled | quote }}
+        {{- if .Values.mesh.cluster.enabled }}
+         - name: MESH_CLUSTER_VERTX_PORT
+           value: 4848
+        {{- end }}
+         - name: MESH_CLUSTER_NAME
+           value: cluster-{{ template "mesh.version.slug" . }}
+         - name: MESH_ELASTICSEARCH_START_EMBEDDED
+           value: false
+         - name: MESH_AUTH_KEYSTORE_PATH
+           value: "/config/keystore.jceks"
+         - name: MESH_BINARY_DIR
+           value: "/uploads"
+         - name: MESH_GRAPH_BACKUP_DIRECTORY
+           value: "/backups-nfs/orientdb"
+        {{- if .Values.elasticsearch.enabled }}
+         - name: MESH_ELASTICSEARCH_URL
+           value: {{ tpl .Values.elasticsearch.url . | quote }}
+        {{- end }}
+        {{- range $name, $value := .Values.mesh.additionalEnvironmentVariables }}
+         - name: {{ tpl $name $ }}
+           value: {{ tpl $value $ }}
+        {{- end }}
+        ports:
+          - name: http
+            containerPort: 8080
+            protocol: TCP
+          - name: obinary
+            containerPort: 2424
+            protocol: TCP
+          - name: ohttp
+            containerPort: 2480
+            protocol: TCP
+          - name: hazelcast
+            containerPort: 5701
+            protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.livenessProbe.httpGet.path | default "/api/v1/" }}
+            port: http
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          failureThreshold: 10
+        #master readinessProbe is associated to hazelcast port vs replica readiness is associated to status
+        readinessProbe:
+          tcpSocket:
+            {{- if .Values.mesh.cluster.enabled }}
+            port: hazelcast
+            {{- else }}
+            port: http
+            {{- end }}
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          failureThreshold: 10
+
+        resources:
+{{ toYaml .Values.resources | indent 12 }}
+        volumeMounts:
+          - name: {{ template "mesh.nfs.name" . }}
+            mountPath: "/uploads"
+            subPath: {{ template "mesh.fullname.no.override" . }}-uploads
+          - name: mesh-config
+            mountPath: "/config"
+          - name: mesh-data-master
+            mountPath: "/elasticsearch/data"
+            subPath: "elasticsearch"
+          - name: mesh-data-master
+            mountPath: "/graphdb"
+            subPath: "graphdb"
+          - name: {{ template "mesh.nfs.name" . }}
+            mountPath: "/backups-nfs"
+            subPath: {{ template "mesh.fullname.no.override" . }}-backups
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000 #user to run used by mesh official image, if not setted we got some filesystem errors at startup
+      volumes:
+      - name: mesh-config
+        configMap:
+          name: {{ template "mesh.fullname" . }}-config
+      {{- if not .Values.persistence.enabled }}
+      - name: mesh-data-master
+        emptyDir: {}
+      - name: mesh-uploads
+        emptyDir: {}
+      {{- else }}
+      {{- if and (eq .Values.persistence.nfs.enabled true) (eq .Values.persistence.enabled true) }}
+      - name: mesh-uploads
+        persistentVolumeClaim:
+          claimName: {{ template "mesh.fullname.no.override" . }}-uploads
+      {{- end}}
+      {{- if .Values.persistence.existingClaim }}
+      - name: mesh-data-master
+        persistentVolumeClaim:
+          claimName: {{ .Values.persistence.data.existingClaim }}
+      {{- else }}
+      {{- if .Values.mesh.master.tolerations }}
+      tolerations:
+{{ toYaml .Values.mesh.master.tolerations | indent 8 }}
+      {{- end }}
+      {{- if .Values.mesh.master.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.mesh.master.nodeSelector | indent 8 }}
+      {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: "{{ template "mesh.name" . }}"
+                    release: "{{ .Release.Name }}"
+  volumeClaimTemplates:
+    - metadata:
+        name: mesh-data-master
+        labels:
+          app: {{ template "mesh.name" . }}
+          chart: "{{ .Chart.Name }}"
+          release: {{ .Release.Name }}
+          heritage: {{ .Release.Service }}
+      spec:
+        accessModes:
+        {{- range .Values.persistence.accessModes }}
+          - {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size | quote }}
+      {{- if .Values.persistence.storageClass }}
+      {{- if (eq "-" .Values.persistence.storageClass) }}
+        storageClassName: ""
+      {{- else }}
+        storageClassName: {{ .Values.persistence.storageClass | quote }}
+      {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+

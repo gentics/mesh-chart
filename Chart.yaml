@@ -1,0 +1,7 @@
+appVersion: 0.33.0
+description: Opensource headless content management system (https://getmesh.io)
+name: gentics-mesh
+maintainers:
+- email: j.schueth@gentics.com
+  name: Johannes Schüth
+version: 2.0.0

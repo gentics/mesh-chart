@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mesh.fullname" . }}-backup-explorer
+  labels:
+    app.kubernetes.io/name: {{ include "mesh.name" . }}
+    helm.sh/chart: {{ include "mesh.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: {{ include "mesh.name" . }}-backup-explorer
+    app.kubernetes.io/instance: {{ .Release.Name }}

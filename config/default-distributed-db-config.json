@@ -1,0 +1,22 @@
+{
+  "autoDeploy": true,
+  "hotAlignment": false,
+  "executionMode": "asynchronous",
+  "readQuorum": 1,
+  "writeQuorum": 1,
+  "failureAvailableNodesLessQuorum": false,
+  "readYourWrites": true,
+  "newNodeStrategy": "dynamic",
+  "servers": {
+    "{{ template "mesh.fullname" . }}-master-0": "master",
+    "{{ template "mesh.fullname" . }}-master-0@{{ template "mesh.version.slug" . }}": "master",
+    "*": "replica"
+  },
+  "clusters": {
+    "internal": {
+    },
+    "*": {
+      "servers": ["<NEW_NODE>"]
+    }
+  }
+}

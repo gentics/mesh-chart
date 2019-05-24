@@ -1,0 +1,6 @@
+charts/
+config/keystore.jceks
+.idea/
+.vscode
+secrets/
+test-values.yaml

@@ -1,0 +1,52 @@
+---
+defaultMaxDepth: 10
+defaultLanguage: "en"
+updateCheck: false #MESH_UPDATECHECK
+vertxOptions:
+  workerPoolSize: 40 #double value to prevent a stuck under heavy load /children (bug needs to be fixed)
+  eventPoolSize: 16 #com.gentics.mesh.core.endpoint.node.NodeCrudHandler.lambda$handleReadChildren$11(NodeCrudHandler.java:214)
+tempDirectory: "data/tmp"
+#pluginDirectory: "plugins"
+nodeName: "Undulating Luvdisc" #MESH_NODE_NAME
+httpServer:
+  port: 8080
+  host: "0.0.0.0"
+  corsAllowedOriginPattern: ""
+  corsAllowCredentials: false
+  enableCors: false
+  ssl: false
+  certPath: "config/cert.pem"
+  keyPath: "config/key.pem"
+cluster: #MESH_CLUSTER_NAME #MESH_CLUSTER_NETWORK_HOST
+  enabled: false #MESH_CLUSTER_ENABLED
+  vertxPort: 4848 #MESH_CLUSTER_VERTX_PORT=4848 https://github.com/gentics/mesh/issues/519
+  networkHost: "0.0.0.0"
+storage:
+  directory: "/graphdb"
+  backupDirectory: "/backups-nfs/orientdb" #MESH_GRAPH_BACKUP_DIRECTORY
+  exportDirectory: "data/export"
+  startServer: false
+  parameters: {}
+search:
+  url: "http://localhost:9200" #MESH_ELASTICSEARCH_URL
+  timeout: 8000
+  startupTimeout: 180
+  bulkLimit: 2000
+  prefix: "mesh-"
+upload:
+  byteLimit: 262144000
+  directory: "/uploads" #MESH_BINARY_DIR
+  tempDirectory: "data/tmp/file-uploads"
+security:
+  tokenExpirationTime: 3600
+  keystorePassword: "MESH_AUTH_KEYSTORE_PASS" #MESH_AUTH_KEYSTORE_PASS
+  keystorePath: "/config/keystore.jceks" #MESH_AUTH_KEYSTORE_PATH
+  algorithm: "HS256"
+  enableAnonymousAccess: true
+  oauth2:
+    enabled: false
+    mapperScriptDevMode: false
+image:
+  imageCacheDirectory: "data/binaryImageCache"
+  maxWidth: 2048
+  maxHeight: 2048

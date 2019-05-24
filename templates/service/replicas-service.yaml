@@ -1,0 +1,22 @@
+{{- if .Values.mesh.cluster.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "mesh.fullname" . }}-replicas
+  labels:
+    app: {{ template "mesh.name" . }}
+    chart: {{ template "mesh.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ template "mesh.name" . }}
+    role: replicas
+    release: {{ .Release.Name }}
+{{- end }}

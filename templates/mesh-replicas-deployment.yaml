@@ -1,0 +1,147 @@
+{{- if .Values.mesh.cluster.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "mesh.fullname" . }}-replicas
+  labels:
+    app: {{ template "mesh.name" . }}
+    chart: {{ template "mesh.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.mesh.cluster.replicas }}
+  selector:
+    matchLabels:
+      release: {{ .Release.Name }}
+      role: replicas
+      app: {{ template "mesh.name" . }}
+  serviceName: "mesh-replicas"
+  template:
+    metadata:
+      labels:
+        release: {{ .Release.Name }}
+        role: replicas
+        app: {{ template "mesh.name" . }}
+    spec:
+      terminationGracePeriodSeconds: 15
+      initContainers:
+      - name: init
+        image: alpine
+        command: ["/bin/sh", "/config/init-slave-node.sh"]
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        {{- if and (eq .Values.persistence.nfs.enabled false) (eq .Values.persistence.enabled true) }}
+        # in this particuliar case (persistance without nfs) we use mesh-data-master to store uploads
+        - name: mesh-data-master
+        {{- else }}
+        - name: mesh-uploads
+        {{- end }}
+          mountPath: "/uploads"
+          subPath: {{ template "mesh.fullname.no.override" . }}-uploads
+        - name: mesh-config
+          mountPath: /config
+        - name: mesh-data
+          mountPath: "/graphdb"
+          subPath: "graphdb"
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/bin/sh", "/config/startup-slave-node.sh"]
+        env:
+         - name: "hazelcast.kubernetes.service-dns"
+           value: {{ template "mesh.fullname" . }}-hazelcast.{{ .Release.Namespace }}.svc.cluster.local
+         - name: MESH_CLUSTER_ENABLED # replica cannot work without cluster
+           value: "true"
+        {{- if .Values.mesh.cluster.enabled }}
+         - name: MESH_CLUSTER_VERTX_PORT
+           value: 4848
+        {{- end }}
+         - name: MESH_CLUSTER_NAME
+           value: cluster-{{ template "mesh.version.slug" . }}
+         - name: MESH_ELASTICSEARCH_START_EMBEDDED # replica cannot work without external elasticsearch
+           value: "false"
+         - name: MESH_AUTH_KEYSTORE_PATH
+           value: "/config/keystore.jceks"
+         - name: MESH_BINARY_DIR
+           value: "/uploads"
+         - name: MESH_ELASTICSEARCH_URL
+           value: {{ tpl .Values.elasticsearch.url . | quote }}
+        {{- range $name, $value := .Values.mesh.additionalEnvironmentVariables }}
+         - name: {{ tpl $name $ }}
+           value: {{ tpl $value $ }}
+        {{- end }}
+        ports:
+          - name: http
+            containerPort: 8080
+            protocol: TCP
+          - name: obinary
+            containerPort: 2424
+            protocol: TCP
+          - name: ohttp
+            containerPort: 2480
+            protocol: TCP
+          - name: hazelcast
+            containerPort: 5701
+            protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.livenessProbe.httpGet.path | default "/api/v1/" }}
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          failureThreshold: 4
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.readinessProbe.httpGet.path | default "/api/v1/admin/status" }}
+            port: http
+          initialDelaySeconds: 45
+          periodSeconds: 15
+          failureThreshold: 5
+        resources:
+{{ toYaml .Values.resources | indent 12 }}
+        volumeMounts:
+          - name: mesh-uploads
+            mountPath: "/uploads"
+            subPath: {{ template "mesh.fullname.no.override" . }}-uploads
+          - name: mesh-config
+            mountPath: "/config"
+          - name: mesh-data
+            mountPath: "/graphdb"
+            subPath: "graphdb"
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000 #user to run used by mesh official image, if not setted we got some filesystem errors at startup
+      volumes:
+      - name: mesh-config
+        configMap:
+          name: {{ template "mesh.fullname" . }}-config
+      {{- if and (eq .Values.persistence.nfs.enabled true) (eq .Values.persistence.enabled true) }}
+      - name: mesh-uploads
+        persistentVolumeClaim:
+          claimName: {{ template "mesh.fullname.no.override" . }}-uploads
+      {{- else }}
+      - name: mesh-uploads
+        emptyDir: {}
+      {{- end }}
+      - name: mesh-data
+        emptyDir: {}
+
+    {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+    {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: "{{ template "mesh.name" . }}"
+                  release: "{{ .Release.Name }}"
+
+
+{{- end}}

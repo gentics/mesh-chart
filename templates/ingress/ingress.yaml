@@ -1,0 +1,39 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ template "mesh.fullname" . }}
+  labels:
+    app: {{ template "mesh.name" . }}
+    chart: {{ template "mesh.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.global.ingressClass | default "nginx" }}
+    kubernetes.io/tls-acme: "false"
+{{- with .Values.ingress.annotations }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  {{- if .Values.ingress.tls }}
+  tls:
+      - hosts:
+        - {{ template "mesh.host" . }}
+        - {{ template "mesh.host-replicas" . }}
+        - {{ template "mesh.host-backup-explorer" . }}
+        secretName: {{ template "certificate.fullname" . }}
+  {{- end }}
+  rules:
+    - host: {{ template "mesh.host" . }}
+      http:
+        paths:
+          #redirect to new ui
+          - path: /
+            backend:
+              serviceName: {{ template "mesh.fullname" . }}-ui
+              servicePort: http
+          - path: /api
+            backend:
+              serviceName: {{ template "mesh.fullname" . }}-master
+              servicePort: http
+{{- end }}

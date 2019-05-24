@@ -1,0 +1,110 @@
+# Default values for Gentics Mesh.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+image:
+  repository: gentics/mesh
+  tag: 0.33.0
+  pullPolicy: IfNotPresent
+
+global:
+  domain: mydomain.com
+
+ingress:
+  enabled: true
+  tls: true
+  # if true will generate https certificate via letsencrypt
+  acme: true 
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 8m
+
+resources:
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+   limits:
+    cpu: 2000m
+    memory: 4096Mi
+   requests:
+    cpu: 500m
+    memory: 2048Mi
+
+persistence:
+  backup:
+    enabled: true # if true will create a backup cronjob (only active if nfs is available)
+    schedule: "0 3 * * *"
+    keepDays: 60 # purge will remove backup older than this value in days
+  enabled: true
+
+  ## A manually managed Persistent Volume and Claim
+  ## Requires persistence.enabled: true
+  ## If defined,  PVC must be created manually before volume will be bound
+  # existingClaim:
+
+  ## Gentics Mesh master data Persistent Volume Storage Class
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  storageClass: "ssd"
+  accessModes:
+  - ReadWriteOnce
+  size: 10Gi
+
+  # nfs informations can be retreive with cmd
+  # gcloud beta filestore instances list --project=project-id
+  # nfs is used only is persistence is enabled
+  # nfs is used to mount uploads volume (shared between master and replicas)
+  # nfs is MANDATORY when using mesh.cluster with replicas
+  nfs:
+    enabled: true # if false same regular data volume will be used (NB: so binaries uploads will not be shared among Gentics Mesh instances)
+    storage: 20Gi
+    path: /default #NFS SERVER PATH
+    server: X.X.X.X #NFS SERVER IP
+
+readinessProbe:
+  httpGet: {}
+
+livenessProbe:
+  httpGet: {}
+
+mesh:
+  additionalEnvironmentVariables:
+    JAVA_TOOL_OPTIONS: "-Xms1250m -Xmx1250m -XX:MaxDirectMemorySize=512m -Dstorage.diskCache.bufferSize=512"
+  cluster:
+    enabled: true #NB: if cluster enabled nfs persistence SHOULD be enabled too
+    replicas: 2 #if cluster enabled is false set replicas count to 0
+  master:
+    nodeSelector: {}
+    toleration: {}
+
+elasticsearch:
+  enabled: true #if not enabled, es will be started in Gentics Mesh container, else es will be started outside using official elasticsearch chart
+  image:
+    tag: 6.6.4
+  url: http://{{ .Release.Name }}-elasticsearch-client:9200
+  data:
+    antiAffinity: "hard"
+    persistence:
+      size: "10Gi"
+      storageClass: ssd
+  client:
+    antiAffinity: "hard"
+  master:
+    antiAffinity: "hard"
+    persistence:
+      size: "4Gi"
+      storageClass: ssd
+  cluster: #quick and dirty fix to get cluster name relative to discovery service fullname (differents clusters cant join each others)
+    name: c-${DISCOVERY_SERVICE}
+
+java:
+  xmx: 2048m
+
+autoscaling:
+  enabled: false
+  maxReplicas: 5
+  minReplicas: 2
+  targetCPUUtilizationPercentage: 80 # percent against request cpu
