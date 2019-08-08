@@ -4,9 +4,9 @@ This repository contains a Gentics Mesh Helm Chart for K8S.
 
 ## Work in Progress
 
-This chart is currently work-in progress and may currently only be used as a reference.
+This chart is based on https://github.com/cschockaert/getmesh-chart by Clément Schockaert and is currently work in progress. Please only use it as a reference for creating your own charts.
 
-## TODO 
+## TODO
 
 * Better management of keystore, actually keystore is located in config folder (in order to share it with other replicas instances)
 you have to manually create it, or let mesh create it but share keystore with other instances (with nfs volume like uploads for eg)
@@ -49,4 +49,3 @@ The `default-distributed-db-config.json` is modified with master node name and o
 The mesh-ui deployment is only active on master service via ingress: mesh.RELEASE-NAME.yourdomain.net
 
 Replicas instances are accessible on replica service or with ingress: mesh-replicas.RELEASE-NAME.yourdomain.net
-
