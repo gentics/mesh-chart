@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 image:
   repository: gentics/mesh
-  tag: 0.33.0
+  tag: 1.3.2
   pullPolicy: IfNotPresent
 
 global:
@@ -11,9 +11,6 @@ global:
 
 ingress:
   enabled: true
-  tls: true
-  # if true will generate https certificate via letsencrypt
-  acme: true 
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: 8m
 
@@ -81,7 +78,7 @@ mesh:
     toleration: {}
 
 elasticsearch:
-  enabled: true #if not enabled, es will be started in Gentics Mesh container, else es will be started outside using official elasticsearch chart
+  enabled: false #if not enabled, es will be started in Gentics Mesh container, else es will be started outside using official elasticsearch chart
   image:
     tag: 6.6.4
   url: http://{{ .Release.Name }}-elasticsearch-client:9200
