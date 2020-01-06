@@ -8,7 +8,7 @@ metadata:
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
-  replicas: 1 # we use only 1 master and X replicas in this chart
+  replicas: {{ .Values.mesh.cluster.masters }}
   selector:
     matchLabels:
       release: {{ .Release.Name }}

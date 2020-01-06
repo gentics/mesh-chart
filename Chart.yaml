@@ -7,10 +7,3 @@ maintainers:
 - email: j.schueth@gentics.com
   name: Johannes Schüth
 version: 1.0.0
-
-#dependencies:
-#- name: elasticsearch
-#  version: 7.1.0
-#  repository: "https://helm.elastic.co"
-#  condition: elasticsearch.enabled
-

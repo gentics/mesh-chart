@@ -1,3 +1,3 @@
-# 0.1.0 (TBD)
+# 1.0.0 (TBD)
 
-* Initial release with support for Gentics Mesh 0.33.0
+* Initial release with support for Gentics Mesh 1.3.2

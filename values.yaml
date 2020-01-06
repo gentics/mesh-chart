@@ -73,6 +73,7 @@ mesh:
   cluster:
     enabled: true #NB: if cluster enabled nfs persistence SHOULD be enabled too
     replicas: 2 #if cluster enabled is false set replicas count to 0
+    masters: 1
   master:
     nodeSelector: {}
     toleration: {}
